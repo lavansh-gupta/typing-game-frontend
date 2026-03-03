@@ -24,8 +24,18 @@ const App = () => {
 //hehe remember never give up bro 
   // ===== INITIALIZE SOCKET CONNECTION =====
   useEffect(() => {
+    const configuredServerUrl = import.meta.env.VITE_SERVER_URL?.trim();
+    const isLocalHost =
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const serverUrl = configuredServerUrl || (isLocalHost ? 'http://localhost:5000' : null);
+
+    if (!serverUrl) {
+      setErrorMessage('Server URL is not configured. Set VITE_SERVER_URL in frontend deployment.');
+      return;
+    }
+
     // Connect to backend server
-    socketRef.current = io(import.meta.env.VITE_SERVER_URL || 'http://localhost:5000', {
+    socketRef.current = io(serverUrl, {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -42,6 +52,11 @@ const App = () => {
     socketRef.current.on('disconnect', () => {
       console.log('❌ Disconnected from server');
       setConnected(false);
+    });
+
+    socketRef.current.on('connect_error', (err) => {
+      console.error('Socket connection error:', err?.message || err);
+      setErrorMessage(`Unable to connect to server: ${serverUrl}`);
     });
 
     // ===== LISTEN FOR SERVER EVENTS =====
