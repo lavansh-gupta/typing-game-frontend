@@ -21,7 +21,7 @@ const App = () => {
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const inputRef = useRef(null);
-
+//hehe remember never give up bro 
   // ===== INITIALIZE SOCKET CONNECTION =====
   useEffect(() => {
     // Connect to backend server
