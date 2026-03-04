@@ -26,6 +26,17 @@ const App = () => {
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const inputRef = useRef(null);
+  const confettiParticlesRef = useRef(
+    Array.from({ length: 64 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 0.8,
+      duration: 2.8 + Math.random() * 2.6,
+      drift: (Math.random() - 0.5) * 180,
+      size: 8 + Math.random() * 10,
+      color: ['#22d3ee', '#84cc16', '#f59e0b', '#f43f5e', '#a78bfa', '#ffffff'][i % 6]
+    }))
+  );
 //hehe remember never give up bro 
 
   const ensureAudioContext = () => {
@@ -556,87 +567,113 @@ const App = () => {
   };
 
   // ===== RESULTS SCREEN =====
-  const ResultsScreen = () => (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="max-w-2xl mx-auto">
-        <h2 className="text-5xl font-black mb-8 text-center">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-lime-400 to-cyan-400">
-            RACE COMPLETE
-          </span>
-        </h2>
+  const ResultsScreen = () => {
+    const isCurrentPlayerWinner = Boolean(results?.[0] && results[0].name === playerName);
 
-        {/* FINAL STATS */}
-        <div className="bg-gray-900 border-2 border-lime-400/50 rounded-lg p-8 mb-8">
-          <div className="text-center mb-8">
-            <p className="text-gray-400 mb-2">Your WPM</p>
-            <p className="text-5xl font-black text-cyan-400">{calculateWPM()}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-black/50 p-4 rounded border border-cyan-400/20">
-              <p className="text-gray-400 text-sm">ACCURACY</p>
-              <p className="text-3xl font-black text-lime-400">{calculateAccuracy()}%</p>
-            </div>
-            <div className="bg-black/50 p-4 rounded border border-cyan-400/20">
-              <p className="text-gray-400 text-sm">TIME</p>
-              <p className="text-3xl font-black text-purple-400">{gameTime.toFixed(1)}s</p>
-            </div>
-          </div>
-        </div>
-
-        {/* LEADERBOARD - FROM SERVER */}
-        {results && (
-          <div className="bg-gray-900 border-2 border-cyan-400/50 rounded-lg p-6 mb-8">
-            <h3 className="text-xl font-bold mb-4">LEADERBOARD</h3>
-            <div className="space-y-2">
-              {results.map((entry, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-gray-800/50 rounded border border-cyan-400/20">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{['🥇', '🥈', '🥉'][i] || '•'}</span>
-                    <span className="font-semibold">{entry.name}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-cyan-400 font-bold">{entry.wpm} WPM</div>
-                    <div className="text-lime-400 text-sm">{entry.accuracy}% acc</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+    return (
+      <div className="min-h-screen bg-black text-white p-6 relative overflow-hidden">
+        {isCurrentPlayerWinner && (
+          <div className="confetti-overlay" aria-hidden="true">
+            {confettiParticlesRef.current.map((piece) => (
+              <span
+                key={piece.id}
+                className="confetti-piece"
+                style={{
+                  left: `${piece.left}%`,
+                  width: `${piece.size}px`,
+                  height: `${piece.size * 0.45}px`,
+                  backgroundColor: piece.color,
+                  animationDelay: `${piece.delay}s`,
+                  animationDuration: `${piece.duration}s`,
+                  '--confetti-drift': `${piece.drift}px`
+                }}
+              />
+            ))}
           </div>
         )}
+        <div className="max-w-2xl mx-auto relative z-10">
+          <h2 className="text-5xl font-black mb-8 text-center">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-lime-400 to-cyan-400">
+              RACE COMPLETE
+            </span>
+          </h2>
+          {isCurrentPlayerWinner && (
+            <p className="text-center text-yellow-300 font-bold tracking-widest mb-6">VICTORY</p>
+          )}
 
-        {/* ACTION BUTTONS */}
-        <div className="flex gap-4">
-          <button
-            onClick={() => {
-              setScreen('waiting');
-              setUserInput('');
-              setGameTime(0);
-              setGameStarted(false);
-              setResults(null);
-              timeUpPlayedRef.current = false;
-              winningTonePlayedRef.current = false;
-            }}
-            className="flex-1 py-4 bg-gradient-to-r from-cyan-500 to-lime-500 text-black font-bold rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center justify-center gap-2"
-          >
-            <RotateCcw size={20} /> REMATCH
-          </button>
-          <button
-            onClick={() => {
-              setScreen('lobby');
-              setRoomCode('');
-              setResults(null);
-              timeUpPlayedRef.current = false;
-              winningTonePlayedRef.current = false;
-            }}
-            className="flex-1 py-4 bg-gray-800 border border-cyan-400/50 text-white font-bold rounded-lg hover:bg-gray-700 transition-all"
-          >
-            Back to Lobby
-          </button>
+          {/* FINAL STATS */}
+          <div className="bg-gray-900 border-2 border-lime-400/50 rounded-lg p-8 mb-8">
+            <div className="text-center mb-8">
+              <p className="text-gray-400 mb-2">Your WPM</p>
+              <p className="text-5xl font-black text-cyan-400">{calculateWPM()}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-black/50 p-4 rounded border border-cyan-400/20">
+                <p className="text-gray-400 text-sm">ACCURACY</p>
+                <p className="text-3xl font-black text-lime-400">{calculateAccuracy()}%</p>
+              </div>
+              <div className="bg-black/50 p-4 rounded border border-cyan-400/20">
+                <p className="text-gray-400 text-sm">TIME</p>
+                <p className="text-3xl font-black text-purple-400">{gameTime.toFixed(1)}s</p>
+              </div>
+            </div>
+          </div>
+
+          {/* LEADERBOARD - FROM SERVER */}
+          {results && (
+            <div className="bg-gray-900 border-2 border-cyan-400/50 rounded-lg p-6 mb-8">
+              <h3 className="text-xl font-bold mb-4">LEADERBOARD</h3>
+              <div className="space-y-2">
+                {results.map((entry, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-gray-800/50 rounded border border-cyan-400/20">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{['🥇', '🥈', '🥉'][i] || '•'}</span>
+                      <span className="font-semibold">{entry.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-cyan-400 font-bold">{entry.wpm} WPM</div>
+                      <div className="text-lime-400 text-sm">{entry.accuracy}% acc</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ACTION BUTTONS */}
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setScreen('waiting');
+                setUserInput('');
+                setGameTime(0);
+                setGameStarted(false);
+                setResults(null);
+                timeUpPlayedRef.current = false;
+                winningTonePlayedRef.current = false;
+              }}
+              className="flex-1 py-4 bg-gradient-to-r from-cyan-500 to-lime-500 text-black font-bold rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center justify-center gap-2"
+            >
+              <RotateCcw size={20} /> REMATCH
+            </button>
+            <button
+              onClick={() => {
+                setScreen('lobby');
+                setRoomCode('');
+                setResults(null);
+                timeUpPlayedRef.current = false;
+                winningTonePlayedRef.current = false;
+              }}
+              className="flex-1 py-4 bg-gray-800 border border-cyan-400/50 text-white font-bold rounded-lg hover:bg-gray-700 transition-all"
+            >
+              Back to Lobby
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ===== RENDER CURRENT SCREEN =====
   return (
