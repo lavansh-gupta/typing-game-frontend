@@ -144,6 +144,9 @@ const App = () => {
       setGameText(data.text);
       setGameTime(0);
       setUserInput('');
+      if (typingTextContainerRef.current) {
+        typingTextContainerRef.current.scrollTop = 0;
+      }
       timeUpPlayedRef.current = false;
       winningTonePlayedRef.current = false;
       // Countdown 3 seconds then show game screen
@@ -207,16 +210,22 @@ const App = () => {
   useEffect(() => {
     const container = typingTextContainerRef.current;
     if (!container || !gameText.length || screen !== 'game') return;
+    if (userInput.length === 0) {
+      container.scrollTop = 0;
+      return;
+    }
 
     const activeChar = container.querySelector('[data-active-char="true"]');
     if (!activeChar) return;
 
     const lineHeight = parseFloat(window.getComputedStyle(container).lineHeight) || 32;
-    const topBuffer = lineHeight * 1.2;
-    const bottomBuffer = lineHeight * 1.4;
+    const topBuffer = lineHeight * 1.8;
+    const bottomBuffer = lineHeight * 1.8;
 
-    const charTop = activeChar.offsetTop;
-    const charBottom = charTop + activeChar.offsetHeight;
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = activeChar.getBoundingClientRect();
+    const charTop = activeRect.top - containerRect.top + container.scrollTop;
+    const charBottom = charTop + activeRect.height;
     const visibleTop = container.scrollTop + topBuffer;
     const visibleBottom = container.scrollTop + container.clientHeight - bottomBuffer;
 
@@ -611,7 +620,7 @@ const App = () => {
           <div className="bg-gray-900 border-2 border-cyan-400/50 rounded-lg p-8 mb-8">
             <div
               ref={typingTextContainerRef}
-              className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto py-3"
+              className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto py-5"
             >
               {renderTextWithWordLevelHighlight()}
             </div>
