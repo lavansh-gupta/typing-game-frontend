@@ -2,10 +2,15 @@
 import { Send, Copy, Check, Play, RotateCcw } from 'lucide-react';
 import io from 'socket.io-client';
 
+const GAME_TIME_LIMIT_SECONDS = 60;
+
 const App = () => {
   // ===== SOCKET.IO SETUP =====
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
+  const audioContextRef = useRef(null);
+  const timeUpPlayedRef = useRef(false);
+  const winningTonePlayedRef = useRef(false);
 
   // ===== COMPONENT STATES =====
   const [screen, setScreen] = useState('home');
@@ -22,6 +27,59 @@ const App = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const inputRef = useRef(null);
 //hehe remember never give up bro 
+
+  const ensureAudioContext = () => {
+    if (typeof window === 'undefined') return null;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioCtx();
+    }
+
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(() => {});
+    }
+
+    return audioContextRef.current;
+  };
+
+  const playTone = ({ frequency, duration = 0.12, type = 'sine', volume = 0.12 }) => {
+    const audioCtx = ensureAudioContext();
+    if (!audioCtx) return;
+
+    const startAt = audioCtx.currentTime;
+    const endAt = startAt + duration;
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+    oscillator.start(startAt);
+    oscillator.stop(endAt + 0.02);
+  };
+
+  const playWrongKeyBeep = () => {
+    playTone({ frequency: 220, duration: 0.08, type: 'square', volume: 0.09 });
+  };
+
+  const playWinningTone = () => {
+    playTone({ frequency: 523.25, duration: 0.11, type: 'triangle', volume: 0.1 });
+    setTimeout(() => playTone({ frequency: 659.25, duration: 0.11, type: 'triangle', volume: 0.1 }), 120);
+    setTimeout(() => playTone({ frequency: 783.99, duration: 0.14, type: 'triangle', volume: 0.11 }), 240);
+  };
+
+  const playTimeUpTone = () => {
+    playTone({ frequency: 329.63, duration: 0.14, type: 'sawtooth', volume: 0.1 });
+    setTimeout(() => playTone({ frequency: 277.18, duration: 0.16, type: 'sawtooth', volume: 0.1 }), 160);
+  };
+
   // ===== INITIALIZE SOCKET CONNECTION =====
   useEffect(() => {
     const configuredServerUrl = import.meta.env.VITE_SERVER_URL?.trim();
@@ -74,6 +132,8 @@ const App = () => {
       setGameText(data.text);
       setGameTime(0);
       setUserInput('');
+      timeUpPlayedRef.current = false;
+      winningTonePlayedRef.current = false;
       // Countdown 3 seconds then show game screen
       setTimeout(() => {
         setGameStarted(true);
@@ -110,6 +170,9 @@ const App = () => {
 
     return () => {
       socketRef.current?.disconnect();
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+      }
     };
   }, []);
 
@@ -137,6 +200,23 @@ const App = () => {
     }, 100);
     return () => clearInterval(interval);
   }, [gameStarted]);
+
+  useEffect(() => {
+    if (!gameStarted || timeUpPlayedRef.current) return;
+    if (gameTime >= GAME_TIME_LIMIT_SECONDS) {
+      playTimeUpTone();
+      timeUpPlayedRef.current = true;
+    }
+  }, [gameStarted, gameTime]);
+
+  useEffect(() => {
+    if (!results || winningTonePlayedRef.current) return;
+    const winner = results[0];
+    if (winner?.name === playerName) {
+      playWinningTone();
+      winningTonePlayedRef.current = true;
+    }
+  }, [results, playerName]);
 
   // ===== CALCULATIONS =====
   const calculateWPM = () => {
@@ -455,7 +535,16 @@ const App = () => {
               ref={inputRef}
               type="text"
               value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
+              onChange={(e) => {
+                const nextInput = e.target.value;
+                if (nextInput.length > userInput.length) {
+                  const lastTypedIndex = nextInput.length - 1;
+                  if (gameText[lastTypedIndex] !== nextInput[lastTypedIndex]) {
+                    playWrongKeyBeep();
+                  }
+                }
+                setUserInput(nextInput);
+              }}
               autoFocus
               className="w-full px-6 py-4 bg-black border-2 border-cyan-400/30 rounded-lg text-white font-mono focus:outline-none focus:border-lime-400 transition-all"
               placeholder="START TYPING..."
@@ -525,6 +614,8 @@ const App = () => {
               setGameTime(0);
               setGameStarted(false);
               setResults(null);
+              timeUpPlayedRef.current = false;
+              winningTonePlayedRef.current = false;
             }}
             className="flex-1 py-4 bg-gradient-to-r from-cyan-500 to-lime-500 text-black font-bold rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center justify-center gap-2"
           >
@@ -535,6 +626,8 @@ const App = () => {
               setScreen('lobby');
               setRoomCode('');
               setResults(null);
+              timeUpPlayedRef.current = false;
+              winningTonePlayedRef.current = false;
             }}
             className="flex-1 py-4 bg-gray-800 border border-cyan-400/50 text-white font-bold rounded-lg hover:bg-gray-700 transition-all"
           >
