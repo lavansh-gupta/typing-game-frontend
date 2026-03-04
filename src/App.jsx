@@ -246,6 +246,42 @@ const App = () => {
     return Math.round((correct / userInput.length) * 100);
   };
 
+  const renderTextWithWordLevelHighlight = () => {
+    if (!gameText) return null;
+
+    const originalWords = gameText.split(' ');
+    const typedWords = userInput.split(' ');
+
+    return originalWords.map((originalWord, wordIndex) => {
+      const typedWord = typedWords[wordIndex] ?? '';
+
+      return (
+        <React.Fragment key={`word-${wordIndex}`}>
+          {originalWord.split('').map((char, charIndex) => {
+            let color = 'text-gray-400';
+            if (charIndex < typedWord.length) {
+              color = typedWord[charIndex] === char ? 'text-lime-400' : 'text-red-400';
+            }
+
+            return (
+              <span key={`char-${wordIndex}-${charIndex}`} className={color}>
+                {char}
+              </span>
+            );
+          })}
+
+          {typedWord.length > originalWord.length && (
+            <span className="text-red-400">
+              {typedWord.slice(originalWord.length)}
+            </span>
+          )}
+
+          {wordIndex < originalWords.length - 1 && <span className="text-gray-400"> </span>}
+        </React.Fragment>
+      );
+    });
+  };
+
   // ===== HOME SCREEN =====
   const HomeScreen = () => (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
@@ -526,20 +562,7 @@ const App = () => {
           {/* TEXT TO TYPE */}
           <div className="bg-gray-900 border-2 border-cyan-400/50 rounded-lg p-8 mb-8">
             <div className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto">
-              {gameText.split('').map((char, i) => {
-                let color = 'text-gray-400';
-                if (i < userInput.length) {
-                  color = userInput[i] === char ? 'text-lime-400' : 'text-red-400';
-                }
-                return (
-                  <span key={i} className={color}>
-                    {char}
-                  </span>
-                );
-              })}
-              {userInput.length > gameText.length && (
-                <span className="text-red-400">{userInput.slice(gameText.length)}</span>
-              )}
+              {renderTextWithWordLevelHighlight()}
             </div>
 
             <input
