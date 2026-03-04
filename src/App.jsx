@@ -26,6 +26,7 @@ const App = () => {
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const inputRef = useRef(null);
+  const typingTextContainerRef = useRef(null);
   const confettiParticlesRef = useRef(
     Array.from({ length: 64 }, (_, i) => ({
       id: i,
@@ -202,6 +203,17 @@ const App = () => {
 
     return () => clearTimeout(timer);
   }, [userInput, gameStarted, currentRoom]);
+
+  useEffect(() => {
+    const container = typingTextContainerRef.current;
+    if (!container || !gameText.length) return;
+
+    const maxScrollTop = container.scrollHeight - container.clientHeight;
+    if (maxScrollTop <= 0) return;
+
+    const progress = Math.min(1, userInput.length / gameText.length);
+    container.scrollTop = maxScrollTop * progress;
+  }, [userInput, gameText]);
 
   // ===== GAME TIMER =====
   useEffect(() => {
@@ -561,7 +573,10 @@ const App = () => {
 
           {/* TEXT TO TYPE */}
           <div className="bg-gray-900 border-2 border-cyan-400/50 rounded-lg p-8 mb-8">
-            <div className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto">
+            <div
+              ref={typingTextContainerRef}
+              className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto"
+            >
               {renderTextWithWordLevelHighlight()}
             </div>
 
