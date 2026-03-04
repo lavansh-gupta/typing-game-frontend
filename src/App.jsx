@@ -206,14 +206,30 @@ const App = () => {
 
   useEffect(() => {
     const container = typingTextContainerRef.current;
-    if (!container || !gameText.length) return;
+    if (!container || !gameText.length || screen !== 'game') return;
+
+    const activeChar = container.querySelector('[data-active-char="true"]');
+    if (!activeChar) return;
+
+    const lineHeight = parseFloat(window.getComputedStyle(container).lineHeight) || 32;
+    const topBuffer = lineHeight * 1.2;
+    const bottomBuffer = lineHeight * 1.4;
+
+    const charTop = activeChar.offsetTop;
+    const charBottom = charTop + activeChar.offsetHeight;
+    const visibleTop = container.scrollTop + topBuffer;
+    const visibleBottom = container.scrollTop + container.clientHeight - bottomBuffer;
+
+    let nextScrollTop = container.scrollTop;
+    if (charTop < visibleTop) {
+      nextScrollTop = charTop - topBuffer;
+    } else if (charBottom > visibleBottom) {
+      nextScrollTop = charBottom - container.clientHeight + bottomBuffer;
+    }
 
     const maxScrollTop = container.scrollHeight - container.clientHeight;
-    if (maxScrollTop <= 0) return;
-
-    const progress = Math.min(1, userInput.length / gameText.length);
-    container.scrollTop = maxScrollTop * progress;
-  }, [userInput, gameText]);
+    container.scrollTop = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
+  }, [userInput, gameText, screen]);
 
   // ===== GAME TIMER =====
   useEffect(() => {
@@ -263,6 +279,8 @@ const App = () => {
 
     const originalWords = gameText.split(' ');
     const typedWords = userInput.split(' ');
+    const activeIndex = Math.min(userInput.length, Math.max(gameText.length - 1, 0));
+    let charCursor = 0;
 
     return originalWords.map((originalWord, wordIndex) => {
       const typedWord = typedWords[wordIndex] ?? '';
@@ -274,9 +292,15 @@ const App = () => {
             if (charIndex < typedWord.length) {
               color = typedWord[charIndex] === char ? 'text-lime-400' : 'text-red-400';
             }
+            const charIndexInText = charCursor;
+            charCursor += 1;
 
             return (
-              <span key={`char-${wordIndex}-${charIndex}`} className={color}>
+              <span
+                key={`char-${wordIndex}-${charIndex}`}
+                className={color}
+                data-active-char={charIndexInText === activeIndex ? 'true' : 'false'}
+              >
                 {char}
               </span>
             );
@@ -288,7 +312,19 @@ const App = () => {
             </span>
           )}
 
-          {wordIndex < originalWords.length - 1 && <span className="text-gray-400"> </span>}
+          {wordIndex < originalWords.length - 1 &&
+            (() => {
+              const spaceIndex = charCursor;
+              charCursor += 1;
+              return (
+                <span
+                  className="text-gray-400"
+                  data-active-char={spaceIndex === activeIndex ? 'true' : 'false'}
+                >
+                  {' '}
+                </span>
+              );
+            })()}
         </React.Fragment>
       );
     });
@@ -575,7 +611,7 @@ const App = () => {
           <div className="bg-gray-900 border-2 border-cyan-400/50 rounded-lg p-8 mb-8">
             <div
               ref={typingTextContainerRef}
-              className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto"
+              className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto py-3"
             >
               {renderTextWithWordLevelHighlight()}
             </div>
