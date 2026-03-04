@@ -215,29 +215,21 @@ const App = () => {
       return;
     }
 
-    const activeChar = container.querySelector('[data-active-char="true"]');
+    const activeIndex = Math.min(userInput.length, Math.max(gameText.length - 1, 0));
+    const activeChar = container.querySelector(`[data-char-index="${activeIndex}"]`);
     if (!activeChar) return;
 
     const lineHeight = parseFloat(window.getComputedStyle(container).lineHeight) || 32;
     const topBuffer = lineHeight * 1.8;
-    const bottomBuffer = lineHeight * 1.8;
 
     const containerRect = container.getBoundingClientRect();
     const activeRect = activeChar.getBoundingClientRect();
     const charTop = activeRect.top - containerRect.top + container.scrollTop;
-    const charBottom = charTop + activeRect.height;
-    const visibleTop = container.scrollTop + topBuffer;
-    const visibleBottom = container.scrollTop + container.clientHeight - bottomBuffer;
-
-    let nextScrollTop = container.scrollTop;
-    if (charTop < visibleTop) {
-      nextScrollTop = charTop - topBuffer;
-    } else if (charBottom > visibleBottom) {
-      nextScrollTop = charBottom - container.clientHeight + bottomBuffer;
-    }
+    const nextScrollTop = charTop - topBuffer;
 
     const maxScrollTop = container.scrollHeight - container.clientHeight;
-    container.scrollTop = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
+    const clamped = Math.max(0, Math.min(maxScrollTop, nextScrollTop));
+    container.scrollTop = Math.max(container.scrollTop, clamped);
   }, [userInput, gameText, screen]);
 
   // ===== GAME TIMER =====
@@ -288,7 +280,6 @@ const App = () => {
 
     const originalWords = gameText.split(' ');
     const typedWords = userInput.split(' ');
-    const activeIndex = Math.min(userInput.length, Math.max(gameText.length - 1, 0));
     let charCursor = 0;
 
     return originalWords.map((originalWord, wordIndex) => {
@@ -308,7 +299,7 @@ const App = () => {
               <span
                 key={`char-${wordIndex}-${charIndex}`}
                 className={color}
-                data-active-char={charIndexInText === activeIndex ? 'true' : 'false'}
+                data-char-index={charIndexInText}
               >
                 {char}
               </span>
@@ -328,7 +319,7 @@ const App = () => {
               return (
                 <span
                   className="text-gray-400"
-                  data-active-char={spaceIndex === activeIndex ? 'true' : 'false'}
+                  data-char-index={spaceIndex}
                 >
                   {' '}
                 </span>
