@@ -3,6 +3,7 @@ import { Send, Copy, Check, Play, RotateCcw } from 'lucide-react';
 import io from 'socket.io-client';
 
 const GAME_TIME_LIMIT_SECONDS = 60;
+const getTimeLimitForMode = (mode) => (mode === 'sprint' ? 60 : null);
 
 const App = () => {
   // ===== SOCKET.IO SETUP =====
@@ -20,6 +21,8 @@ const App = () => {
   const [players, setPlayers] = useState([]);
   const [gameText, setGameText] = useState('');
   const [userInput, setUserInput] = useState('');
+  const [selectedGameMode, setSelectedGameMode] = useState('sprint');
+  const [gameTimeLimit, setGameTimeLimit] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameTime, setGameTime] = useState(0);
   const [results, setResults] = useState(null);
@@ -135,6 +138,10 @@ const App = () => {
     socketRef.current.on('playerJoined', (data) => {
       console.log('🟢 playerJoined event:', data);
       setPlayers(data.players);
+      if (data.gameMode) {
+        setSelectedGameMode(data.gameMode);
+        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+      }
       setErrorMessage('');
     });
 
@@ -142,6 +149,9 @@ const App = () => {
     socketRef.current.on('gameStarted', (data) => {
       console.log('🎮 gameStarted event');
       setGameText(data.text);
+      const modeFromServer = data.gameMode || 'sprint';
+      setSelectedGameMode(modeFromServer);
+      setGameTimeLimit(getTimeLimitForMode(modeFromServer));
       setGameTime(0);
       setUserInput('');
       if (typingTextContainerRef.current) {
@@ -160,6 +170,10 @@ const App = () => {
     socketRef.current.on('playersProgress', (data) => {
       console.log('📊 playersProgress event');
       setPlayers(data.players);
+      if (data.gameMode) {
+        setSelectedGameMode(data.gameMode);
+        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+      }
     });
 
     // Event: Someone finished
@@ -172,6 +186,10 @@ const App = () => {
     socketRef.current.on('raceComplete', (data) => {
       console.log('🎉 raceComplete event:', data);
       setResults(data.results);
+      if (data.gameMode) {
+        setSelectedGameMode(data.gameMode);
+        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+      }
       setGameStarted(false);
       setScreen('results');
     });
@@ -180,6 +198,10 @@ const App = () => {
     socketRef.current.on('playerLeft', (data) => {
       console.log('👤 playerLeft event:', data);
       setPlayers(data.players);
+      if (data.gameMode) {
+        setSelectedGameMode(data.gameMode);
+        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+      }
       setErrorMessage(data.message);
     });
 
@@ -243,11 +265,11 @@ const App = () => {
 
   useEffect(() => {
     if (!gameStarted || timeUpPlayedRef.current) return;
-    if (gameTime >= GAME_TIME_LIMIT_SECONDS) {
+    if (selectedGameMode === 'sprint' && gameTime >= (gameTimeLimit || GAME_TIME_LIMIT_SECONDS)) {
       playTimeUpTone();
       timeUpPlayedRef.current = true;
     }
-  }, [gameStarted, gameTime]);
+  }, [gameStarted, gameTime, selectedGameMode, gameTimeLimit]);
 
   useEffect(() => {
     if (!results || winningTonePlayedRef.current) return;
@@ -273,6 +295,11 @@ const App = () => {
       if (userInput[i] === gameText[i]) correct++;
     }
     return Math.round((correct / userInput.length) * 100);
+  };
+
+  const calculateProgressPercent = () => {
+    if (!gameText.length) return 0;
+    return Math.min(100, Math.round((userInput.length / gameText.length) * 100));
   };
 
   const renderTextWithCharLevelHighlight = () => {
@@ -399,7 +426,10 @@ const App = () => {
                     console.log('✅ Room created:', response.room.roomCode);
                     setCurrentRoom(response.room.roomCode);
                     setPlayers(response.room.players);
-                    setScreen('waiting');
+                    const mode = response.room.gameMode || 'sprint';
+                    setSelectedGameMode(mode);
+                    setGameTimeLimit(getTimeLimitForMode(mode));
+                    setScreen('modeSelection');
                     setErrorMessage('');
                   } else {
                     console.error('❌ Error:', response.error);
@@ -440,7 +470,10 @@ const App = () => {
                       console.log('✅ Joined room:', roomCode);
                       setCurrentRoom(roomCode);
                       setPlayers(response.room.players);
-                      setScreen('waiting');
+                      const mode = response.room.gameMode || 'sprint';
+                      setSelectedGameMode(mode);
+                      setGameTimeLimit(getTimeLimitForMode(mode));
+                      setScreen('modeSelection');
                       setErrorMessage('');
                     } else {
                       console.error('❌ Error:', response.error);
@@ -464,6 +497,96 @@ const App = () => {
             {errorMessage}
           </div>
         )}
+      </div>
+    </div>
+  );
+
+  // ===== MODE SELECTION SCREEN =====
+  const ModeSelectionScreen = () => (
+    <div className="min-h-screen bg-black text-white p-6">
+      <div className="max-w-3xl mx-auto">
+        <button
+          onClick={() => setScreen('waiting')}
+          className="text-cyan-400 hover:text-lime-400 transition mb-8"
+        >
+          ← Back
+        </button>
+
+        <div className="mb-8">
+          <h2 className="text-4xl font-black mb-2">SELECT GAME MODE</h2>
+          <p className="text-gray-400">Choose your typing challenge!</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          <div
+            onClick={() => {
+              setSelectedGameMode('sprint');
+              setGameTimeLimit(60);
+              setScreen('waiting');
+            }}
+            className={`p-6 rounded-lg border-2 cursor-pointer transition transform hover:scale-105 ${
+              selectedGameMode === 'sprint'
+                ? 'border-lime-400 bg-lime-400/10'
+                : 'border-cyan-400/50 bg-gray-900 hover:border-cyan-400'
+            }`}
+          >
+            <h3 className="text-2xl font-bold mb-3 text-lime-400">SPRINT</h3>
+            <div className="space-y-2 mb-4">
+              <p className="text-gray-400 text-sm"><span className="font-semibold">Duration:</span> 1 minute</p>
+              <p className="text-gray-400 text-sm"><span className="font-semibold">Text:</span> 3-4 lines</p>
+            </div>
+            <p className="text-gray-500 text-xs mb-4">Lightning-fast race focused on SPEED. Type as quick as you can!</p>
+            <div className="bg-black/50 p-3 rounded border border-lime-400/30">
+              <p className="text-lime-400 text-xs font-semibold">Highest WPM wins!</p>
+            </div>
+          </div>
+
+          <div
+            onClick={() => {
+              setSelectedGameMode('marathon');
+              setGameTimeLimit(null);
+              setScreen('waiting');
+            }}
+            className={`p-6 rounded-lg border-2 cursor-pointer transition transform hover:scale-105 ${
+              selectedGameMode === 'marathon'
+                ? 'border-cyan-400 bg-cyan-400/10'
+                : 'border-cyan-400/50 bg-gray-900 hover:border-cyan-400'
+            }`}
+          >
+            <h3 className="text-2xl font-bold mb-3 text-cyan-400">MARATHON</h3>
+            <div className="space-y-2 mb-4">
+              <p className="text-gray-400 text-sm"><span className="font-semibold">Duration:</span> No limit</p>
+              <p className="text-gray-400 text-sm"><span className="font-semibold">Text:</span> 2-3 paragraphs</p>
+            </div>
+            <p className="text-gray-500 text-xs mb-4">Longer race focused on ACCURACY. Quality over speed!</p>
+            <div className="bg-black/50 p-3 rounded border border-cyan-400/30">
+              <p className="text-cyan-400 text-xs font-semibold">First to finish wins!</p>
+            </div>
+          </div>
+
+          <div
+            onClick={() => {
+              setSelectedGameMode('endless');
+              setGameTimeLimit(null);
+              setScreen('waiting');
+            }}
+            className={`p-6 rounded-lg border-2 cursor-pointer transition transform hover:scale-105 ${
+              selectedGameMode === 'endless'
+                ? 'border-purple-400 bg-purple-400/10'
+                : 'border-cyan-400/50 bg-gray-900 hover:border-cyan-400'
+            }`}
+          >
+            <h3 className="text-2xl font-bold mb-3 text-purple-400">ENDLESS</h3>
+            <div className="space-y-2 mb-4">
+              <p className="text-gray-400 text-sm"><span className="font-semibold">Duration:</span> No limit</p>
+              <p className="text-gray-400 text-sm"><span className="font-semibold">Text:</span> 20 paragraphs</p>
+            </div>
+            <p className="text-gray-500 text-xs mb-4">Ultimate endurance challenge! Type as much as you can!</p>
+            <div className="bg-black/50 p-3 rounded border border-purple-400/30">
+              <p className="text-purple-400 text-xs font-semibold">Most progress wins!</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -499,6 +622,35 @@ const App = () => {
             </div>
           </div>
 
+          <div className="mb-6 p-4 bg-gray-800/50 border border-cyan-400/30 rounded">
+            <p className="text-gray-400 text-sm mb-2">GAME MODE</p>
+            <div className="flex items-center gap-3">
+              {selectedGameMode === 'sprint' && (
+                <>
+                  <span className="text-2xl"></span>
+                  <span className="text-lg font-bold text-lime-400">SPRINT - 1 Minute</span>
+                </>
+              )}
+              {selectedGameMode === 'marathon' && (
+                <>
+                  <span className="text-2xl">🏃</span>
+                  <span className="text-lg font-bold text-cyan-400">MARATHON - No Timer</span>
+                </>
+              )}
+              {selectedGameMode === 'endless' && (
+                <>
+                  <span className="text-2xl"></span>
+                  <span className="text-lg font-bold text-purple-400">ENDLESS - No Timer</span>
+                </>
+              )}
+            </div>
+            <p className="text-gray-400 text-xs mt-2">
+              {selectedGameMode === 'sprint' && 'Speed race - who types fastest?'}
+              {selectedGameMode === 'marathon' && 'Accuracy race - first to finish wins!'}
+              {selectedGameMode === 'endless' && 'Endurance race - who types the most?'}
+            </p>
+          </div>
+
           <h3 className="text-xl font-bold mb-4">PLAYERS ({players.length})</h3>
           <div className="space-y-2 mb-8">
             {players.map((player, i) => (
@@ -516,9 +668,12 @@ const App = () => {
                 return;
               }
               // EMIT: startGame to server
-              socketRef.current.emit('startGame', { roomCode: currentRoom }, (response) => {
+              socketRef.current.emit('startGame', {
+                roomCode: currentRoom,
+                gameMode: selectedGameMode
+              }, (response) => {
                 if (response.success) {
-                  console.log('✅ Game starting...');
+                  console.log('Game starting in', selectedGameMode, 'mode!');
                   // Server will emit 'gameStarted' event
                   // Listener above will handle showing game screen
                 } else {
@@ -529,7 +684,11 @@ const App = () => {
             }}
             className="w-full py-4 bg-gradient-to-r from-cyan-500 to-lime-500 text-black font-bold text-lg rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center justify-center gap-2"
           >
-            <Play size={20} /> START RACE
+            <Play size={20} />
+            START RACE
+            {selectedGameMode === 'sprint' && ' (1 MIN)'}
+            {selectedGameMode === 'marathon' && ' (MARATHON)'}
+            {selectedGameMode === 'endless' && ' (ENDLESS)'}
           </button>
 
           <p className="text-gray-400 text-sm mt-4 text-center">Waiting for {players.length < 2 ? 'opponent' : 'host to start'}</p>
@@ -540,12 +699,39 @@ const App = () => {
 
   // ===== GAME SCREEN =====
   const GameScreen = () => {
+    const progress = calculateProgressPercent();
     const wpm = calculateWPM();
     const accuracy = calculateAccuracy();
+    const timeRemaining = selectedGameMode === 'sprint'
+      ? Math.max(0, (gameTimeLimit || GAME_TIME_LIMIT_SECONDS) - gameTime)
+      : 0;
+    const isTimeUp = selectedGameMode === 'sprint' && gameTime >= (gameTimeLimit || GAME_TIME_LIMIT_SECONDS);
 
     return (
       <div className="min-h-screen bg-black text-white p-6">
         <div className="max-w-4xl mx-auto">
+          {selectedGameMode === 'sprint' && (
+            <div className="mb-4 p-3 bg-lime-400/10 border border-lime-400/50 rounded text-center">
+              <p className={`text-xl font-bold ${isTimeUp ? 'text-red-400' : 'text-lime-400'}`}>
+                {isTimeUp ? "TIME'S UP!" : `${timeRemaining.toFixed(0)}s remaining`}
+              </p>
+            </div>
+          )}
+          {selectedGameMode === 'marathon' && (
+            <div className="mb-4 p-3 bg-cyan-400/10 border border-cyan-400/50 rounded text-center">
+              <p className="text-cyan-400 font-semibold">
+                🏃 Marathon Mode - Accuracy Focused (No time limit)
+              </p>
+            </div>
+          )}
+          {selectedGameMode === 'endless' && (
+            <div className="mb-4 p-3 bg-purple-400/10 border border-purple-400/50 rounded text-center">
+              <p className="text-purple-400 font-semibold">
+                Endless Mode - Type as much as you can!
+              </p>
+            </div>
+          )}
+
           {/* STATS BAR */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="bg-gray-900 border border-cyan-400/30 rounded p-4">
@@ -557,8 +743,15 @@ const App = () => {
               <p className="text-3xl font-black text-lime-400">{accuracy}%</p>
             </div>
             <div className="bg-gray-900 border border-cyan-400/30 rounded p-4">
-              <p className="text-gray-400 text-sm">TIME</p>
-              <p className="text-3xl font-black text-purple-400">{gameTime.toFixed(1)}s</p>
+              <p className="text-gray-400 text-sm">
+                {selectedGameMode === 'sprint' ? 'TIME' : 'PROGRESS'}
+              </p>
+              <p className="text-3xl font-black text-purple-400">
+                {selectedGameMode === 'sprint'
+                  ? `${gameTime.toFixed(1)}s`
+                  : `${progress}%`
+                }
+              </p>
             </div>
           </div>
 
@@ -607,8 +800,9 @@ const App = () => {
                 setUserInput(nextInput);
               }}
               autoFocus
+              disabled={isTimeUp}
               className="w-full px-6 py-4 bg-black border-2 border-cyan-400/30 rounded-lg text-white font-mono focus:outline-none focus:border-lime-400 transition-all"
-              placeholder="START TYPING..."
+              placeholder={isTimeUp ? "TIME'S UP" : 'START TYPING...'}
             />
           </div>
         </div>
@@ -644,9 +838,19 @@ const App = () => {
         <div className="max-w-2xl mx-auto relative z-10">
           <h2 className="text-5xl font-black mb-8 text-center">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-lime-400 to-cyan-400">
-              RACE COMPLETE
+              {selectedGameMode === 'sprint' && 'SPRINT COMPLETE'}
+              {selectedGameMode === 'marathon' && '🏃 MARATHON COMPLETE'}
+              {selectedGameMode === 'endless' && 'ENDLESS SESSION COMPLETE'}
             </span>
           </h2>
+          <div className="mb-8 p-4 bg-gray-800/50 border border-cyan-400/30 rounded text-center">
+            <p className="text-gray-400 text-sm mb-2">WINNER DETERMINED BY</p>
+            <p className="text-lg font-bold">
+              {selectedGameMode === 'sprint' && 'Highest WPM (Speed)'}
+              {selectedGameMode === 'marathon' && '🏃 First to Finish (Accuracy)'}
+              {selectedGameMode === 'endless' && 'Most Progress % (Endurance)'}
+            </p>
+          </div>
           {isCurrentPlayerWinner && (
             <p className="text-center text-yellow-300 font-bold tracking-widest mb-6">VICTORY</p>
           )}
@@ -664,8 +868,10 @@ const App = () => {
                 <p className="text-3xl font-black text-lime-400">{calculateAccuracy()}%</p>
               </div>
               <div className="bg-black/50 p-4 rounded border border-cyan-400/20">
-                <p className="text-gray-400 text-sm">TIME</p>
-                <p className="text-3xl font-black text-purple-400">{gameTime.toFixed(1)}s</p>
+                <p className="text-gray-400 text-sm">{selectedGameMode === 'sprint' ? 'TIME' : 'PROGRESS'}</p>
+                <p className="text-3xl font-black text-purple-400">
+                  {selectedGameMode === 'sprint' ? `${gameTime.toFixed(1)}s` : `${calculateProgressPercent()}%`}
+                </p>
               </div>
             </div>
           </div>
@@ -683,7 +889,9 @@ const App = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-cyan-400 font-bold">{entry.wpm} WPM</div>
-                      <div className="text-lime-400 text-sm">{entry.accuracy}% acc</div>
+                      <div className="text-lime-400 text-sm">
+                        {selectedGameMode === 'endless' ? `${entry.progress}% progress` : `${entry.accuracy}% acc`}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -711,6 +919,8 @@ const App = () => {
               onClick={() => {
                 setScreen('lobby');
                 setRoomCode('');
+                setCurrentRoom(null);
+                setPlayers([]);
                 setResults(null);
                 timeUpPlayedRef.current = false;
                 winningTonePlayedRef.current = false;
@@ -730,6 +940,7 @@ const App = () => {
     <div className="font-mono">
       {screen === 'home' && HomeScreen()}
       {screen === 'lobby' && LobbyScreen()}
+      {screen === 'modeSelection' && ModeSelectionScreen()}
       {screen === 'waiting' && WaitingScreen()}
       {screen === 'game' && GameScreen()}
       {screen === 'results' && ResultsScreen()}
