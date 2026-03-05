@@ -275,59 +275,35 @@ const App = () => {
     return Math.round((correct / userInput.length) * 100);
   };
 
-  const renderTextWithWordLevelHighlight = () => {
+  const renderTextWithCharLevelHighlight = () => {
     if (!gameText) return null;
 
-    const originalWords = gameText.split(' ');
-    const typedWords = userInput.split(' ');
-    let charCursor = 0;
+    return (
+      <>
+        {gameText.split('').map((char, charIndex) => {
+          let color = 'text-gray-400';
+          if (charIndex < userInput.length) {
+            color = userInput[charIndex] === char ? 'text-lime-400' : 'text-red-400';
+          }
 
-    return originalWords.map((originalWord, wordIndex) => {
-      const typedWord = typedWords[wordIndex] ?? '';
-
-      return (
-        <React.Fragment key={`word-${wordIndex}`}>
-          {originalWord.split('').map((char, charIndex) => {
-            let color = 'text-gray-400';
-            if (charIndex < typedWord.length) {
-              color = typedWord[charIndex] === char ? 'text-lime-400' : 'text-red-400';
-            }
-            const charIndexInText = charCursor;
-            charCursor += 1;
-
-            return (
-              <span
-                key={`char-${wordIndex}-${charIndex}`}
-                className={color}
-                data-char-index={charIndexInText}
-              >
-                {char}
-              </span>
-            );
-          })}
-
-          {typedWord.length > originalWord.length && (
-            <span className="text-red-400">
-              {typedWord.slice(originalWord.length)}
+          return (
+            <span
+              key={`char-${charIndex}`}
+              className={color}
+              data-char-index={charIndex}
+            >
+              {char}
             </span>
-          )}
+          );
+        })}
 
-          {wordIndex < originalWords.length - 1 &&
-            (() => {
-              const spaceIndex = charCursor;
-              charCursor += 1;
-              return (
-                <span
-                  className="text-gray-400"
-                  data-char-index={spaceIndex}
-                >
-                  {' '}
-                </span>
-              );
-            })()}
-        </React.Fragment>
-      );
-    });
+        {userInput.length > gameText.length && (
+          <span className="text-red-400">
+            {userInput.slice(gameText.length)}
+          </span>
+        )}
+      </>
+    );
   };
 
   // ===== HOME SCREEN =====
@@ -613,7 +589,7 @@ const App = () => {
               ref={typingTextContainerRef}
               className="text-center text-xl leading-relaxed font-mono text-gray-300 mb-6 max-h-32 overflow-y-auto py-5"
             >
-              {renderTextWithWordLevelHighlight()}
+              {renderTextWithCharLevelHighlight()}
             </div>
 
             <input
