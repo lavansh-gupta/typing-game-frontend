@@ -834,13 +834,29 @@ const App = () => {
               type="text"
               value={userInput}
               onChange={(e) => {
-                const nextInput = e.target.value;
-                if (nextInput.length > userInput.length) {
+                let nextInput = e.target.value;
+
+                if (selectedGameMode === 'sprint') {
+                  let validPrefixLength = 0;
+                  while (
+                    validPrefixLength < nextInput.length &&
+                    validPrefixLength < gameText.length &&
+                    nextInput[validPrefixLength] === gameText[validPrefixLength]
+                  ) {
+                    validPrefixLength++;
+                  }
+
+                  if (nextInput.length > validPrefixLength) {
+                    playWrongKeyBeep();
+                  }
+                  nextInput = nextInput.slice(0, validPrefixLength);
+                } else if (nextInput.length > userInput.length) {
                   const lastTypedIndex = nextInput.length - 1;
                   if (gameText[lastTypedIndex] !== nextInput[lastTypedIndex]) {
                     playWrongKeyBeep();
                   }
                 }
+
                 setUserInput(nextInput);
               }}
               autoFocus
