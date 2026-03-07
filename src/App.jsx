@@ -22,6 +22,7 @@ const App = () => {
   const [gameText, setGameText] = useState('');
   const [userInput, setUserInput] = useState('');
   const [selectedGameMode, setSelectedGameMode] = useState('sprint');
+  const [isRoomHost, setIsRoomHost] = useState(false);
   const [gameTimeLimit, setGameTimeLimit] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [gameTime, setGameTime] = useState(0);
@@ -426,6 +427,7 @@ const App = () => {
                     console.log('✅ Room created:', response.room.roomCode);
                     setCurrentRoom(response.room.roomCode);
                     setPlayers(response.room.players);
+                    setIsRoomHost(true);
                     const mode = response.room.gameMode || 'sprint';
                     setSelectedGameMode(mode);
                     setGameTimeLimit(getTimeLimitForMode(mode));
@@ -470,10 +472,11 @@ const App = () => {
                       console.log('✅ Joined room:', roomCode);
                       setCurrentRoom(roomCode);
                       setPlayers(response.room.players);
+                      setIsRoomHost(false);
                       const mode = response.room.gameMode || 'sprint';
                       setSelectedGameMode(mode);
                       setGameTimeLimit(getTimeLimitForMode(mode));
-                      setScreen('modeSelection');
+                      setScreen('waiting');
                       setErrorMessage('');
                     } else {
                       console.error('❌ Error:', response.error);
@@ -514,17 +517,22 @@ const App = () => {
 
         <div className="mb-8">
           <h2 className="text-4xl font-black mb-2">SELECT GAME MODE</h2>
-          <p className="text-gray-400">Choose your typing challenge!</p>
+          <p className="text-gray-400">
+            {isRoomHost ? 'Choose your typing challenge!' : 'Only room creator can choose mode.'}
+          </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
           <div
             onClick={() => {
+              if (!isRoomHost) return;
               setSelectedGameMode('sprint');
               setGameTimeLimit(60);
               setScreen('waiting');
             }}
-            className={`p-6 rounded-lg border-2 cursor-pointer transition transform hover:scale-105 ${
+            className={`p-6 rounded-lg border-2 transition transform ${
+              isRoomHost ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-70'
+            } ${
               selectedGameMode === 'sprint'
                 ? 'border-lime-400 bg-lime-400/10'
                 : 'border-cyan-400/50 bg-gray-900 hover:border-cyan-400'
@@ -543,11 +551,14 @@ const App = () => {
 
           <div
             onClick={() => {
+              if (!isRoomHost) return;
               setSelectedGameMode('marathon');
               setGameTimeLimit(null);
               setScreen('waiting');
             }}
-            className={`p-6 rounded-lg border-2 cursor-pointer transition transform hover:scale-105 ${
+            className={`p-6 rounded-lg border-2 transition transform ${
+              isRoomHost ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-70'
+            } ${
               selectedGameMode === 'marathon'
                 ? 'border-cyan-400 bg-cyan-400/10'
                 : 'border-cyan-400/50 bg-gray-900 hover:border-cyan-400'
@@ -566,11 +577,14 @@ const App = () => {
 
           <div
             onClick={() => {
+              if (!isRoomHost) return;
               setSelectedGameMode('endless');
               setGameTimeLimit(null);
               setScreen('waiting');
             }}
-            className={`p-6 rounded-lg border-2 cursor-pointer transition transform hover:scale-105 ${
+            className={`p-6 rounded-lg border-2 transition transform ${
+              isRoomHost ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-70'
+            } ${
               selectedGameMode === 'endless'
                 ? 'border-purple-400 bg-purple-400/10'
                 : 'border-cyan-400/50 bg-gray-900 hover:border-cyan-400'
@@ -661,35 +675,45 @@ const App = () => {
             ))}
           </div>
 
-          <button
-            onClick={() => {
-              if (!connected) {
-                setErrorMessage('Backend server is not connected. Start backend on port 5000.');
-                return;
-              }
-              // EMIT: startGame to server
-              socketRef.current.emit('startGame', {
-                roomCode: currentRoom,
-                gameMode: selectedGameMode
-              }, (response) => {
-                if (response.success) {
-                  console.log('Game starting in', selectedGameMode, 'mode!');
-                  // Server will emit 'gameStarted' event
-                  // Listener above will handle showing game screen
-                } else {
-                  console.error('❌ Error:', response.error);
-                  setErrorMessage(response.error);
+          {isRoomHost ? (
+            <button
+              onClick={() => {
+                if (!connected) {
+                  setErrorMessage('Backend server is not connected. Start backend on port 5000.');
+                  return;
                 }
-              });
-            }}
-            className="w-full py-4 bg-gradient-to-r from-cyan-500 to-lime-500 text-black font-bold text-lg rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center justify-center gap-2"
-          >
-            <Play size={20} />
-            START RACE
-            {selectedGameMode === 'sprint' && ' (1 MIN)'}
-            {selectedGameMode === 'marathon' && ' (MARATHON)'}
-            {selectedGameMode === 'endless' && ' (ENDLESS)'}
-          </button>
+                // EMIT: startGame to server
+                socketRef.current.emit('startGame', {
+                  roomCode: currentRoom,
+                  gameMode: selectedGameMode
+                }, (response) => {
+                  if (response.success) {
+                    console.log('Game starting in', selectedGameMode, 'mode!');
+                    // Server will emit 'gameStarted' event
+                    // Listener above will handle showing game screen
+                  } else {
+                    console.error('❌ Error:', response.error);
+                    setErrorMessage(response.error);
+                  }
+                });
+              }}
+              className="w-full py-4 bg-gradient-to-r from-cyan-500 to-lime-500 text-black font-bold text-lg rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center justify-center gap-2"
+            >
+              <Play size={20} />
+              START RACE
+              {selectedGameMode === 'sprint' && ' (1 MIN)'}
+              {selectedGameMode === 'marathon' && ' (MARATHON)'}
+              {selectedGameMode === 'endless' && ' (ENDLESS)'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="w-full py-4 bg-gray-800 border border-cyan-400/40 text-gray-400 font-bold text-lg rounded-lg cursor-not-allowed"
+            >
+              WAITING FOR HOST TO START
+            </button>
+          )}
 
           <p className="text-gray-400 text-sm mt-4 text-center">Waiting for {players.length < 2 ? 'opponent' : 'host to start'}</p>
         </div>
@@ -921,6 +945,7 @@ const App = () => {
                 setRoomCode('');
                 setCurrentRoom(null);
                 setPlayers([]);
+                setIsRoomHost(false);
                 setResults(null);
                 timeUpPlayedRef.current = false;
                 winningTonePlayedRef.current = false;
