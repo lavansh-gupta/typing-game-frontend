@@ -96,6 +96,33 @@ const App = () => {
     setTimeout(() => playTone({ frequency: 277.18, duration: 0.16, type: 'sawtooth', volume: 0.1 }), 160);
   };
 
+  const applyMode = (mode) => {
+    const nextMode = mode || 'sprint';
+    setSelectedGameMode(nextMode);
+    setGameTimeLimit(getTimeLimitForMode(nextMode));
+  };
+
+  const handleModeSelect = (mode) => {
+    if (!isRoomHost || !currentRoom) return;
+    if (!connected) {
+      setErrorMessage('Backend server is not connected. Start backend on port 5000.');
+      return;
+    }
+
+    socketRef.current.emit('setGameMode', {
+      roomCode: currentRoom,
+      gameMode: mode
+    }, (response) => {
+      if (response.success) {
+        applyMode(response.gameMode || mode);
+        setScreen('waiting');
+        setErrorMessage('');
+      } else {
+        setErrorMessage(response.error);
+      }
+    });
+  };
+
   // ===== INITIALIZE SOCKET CONNECTION =====
   useEffect(() => {
     const configuredServerUrl = import.meta.env.VITE_SERVER_URL?.trim();
@@ -140,10 +167,15 @@ const App = () => {
       console.log('🟢 playerJoined event:', data);
       setPlayers(data.players);
       if (data.gameMode) {
-        setSelectedGameMode(data.gameMode);
-        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+        applyMode(data.gameMode);
       }
       setErrorMessage('');
+    });
+
+    socketRef.current.on('gameModeUpdated', (data) => {
+      if (data.gameMode) {
+        applyMode(data.gameMode);
+      }
     });
 
     // Event: Game started
@@ -151,8 +183,7 @@ const App = () => {
       console.log('🎮 gameStarted event');
       setGameText(data.text);
       const modeFromServer = data.gameMode || 'sprint';
-      setSelectedGameMode(modeFromServer);
-      setGameTimeLimit(getTimeLimitForMode(modeFromServer));
+      applyMode(modeFromServer);
       setGameTime(0);
       setUserInput('');
       if (typingTextContainerRef.current) {
@@ -172,8 +203,7 @@ const App = () => {
       console.log('📊 playersProgress event');
       setPlayers(data.players);
       if (data.gameMode) {
-        setSelectedGameMode(data.gameMode);
-        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+        applyMode(data.gameMode);
       }
     });
 
@@ -188,8 +218,7 @@ const App = () => {
       console.log('🎉 raceComplete event:', data);
       setResults(data.results);
       if (data.gameMode) {
-        setSelectedGameMode(data.gameMode);
-        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+        applyMode(data.gameMode);
       }
       setGameStarted(false);
       setScreen('results');
@@ -200,8 +229,7 @@ const App = () => {
       console.log('👤 playerLeft event:', data);
       setPlayers(data.players);
       if (data.gameMode) {
-        setSelectedGameMode(data.gameMode);
-        setGameTimeLimit(getTimeLimitForMode(data.gameMode));
+        applyMode(data.gameMode);
       }
       setErrorMessage(data.message);
     });
@@ -429,8 +457,7 @@ const App = () => {
                     setPlayers(response.room.players);
                     setIsRoomHost(true);
                     const mode = response.room.gameMode || 'sprint';
-                    setSelectedGameMode(mode);
-                    setGameTimeLimit(getTimeLimitForMode(mode));
+                    applyMode(mode);
                     setScreen('modeSelection');
                     setErrorMessage('');
                   } else {
@@ -474,8 +501,7 @@ const App = () => {
                       setPlayers(response.room.players);
                       setIsRoomHost(false);
                       const mode = response.room.gameMode || 'sprint';
-                      setSelectedGameMode(mode);
-                      setGameTimeLimit(getTimeLimitForMode(mode));
+                      applyMode(mode);
                       setScreen('waiting');
                       setErrorMessage('');
                     } else {
@@ -526,9 +552,7 @@ const App = () => {
           <div
             onClick={() => {
               if (!isRoomHost) return;
-              setSelectedGameMode('sprint');
-              setGameTimeLimit(60);
-              setScreen('waiting');
+              handleModeSelect('sprint');
             }}
             className={`p-6 rounded-lg border-2 transition transform ${
               isRoomHost ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-70'
@@ -552,9 +576,7 @@ const App = () => {
           <div
             onClick={() => {
               if (!isRoomHost) return;
-              setSelectedGameMode('marathon');
-              setGameTimeLimit(null);
-              setScreen('waiting');
+              handleModeSelect('marathon');
             }}
             className={`p-6 rounded-lg border-2 transition transform ${
               isRoomHost ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-70'
@@ -578,9 +600,7 @@ const App = () => {
           <div
             onClick={() => {
               if (!isRoomHost) return;
-              setSelectedGameMode('endless');
-              setGameTimeLimit(null);
-              setScreen('waiting');
+              handleModeSelect('endless');
             }}
             className={`p-6 rounded-lg border-2 transition transform ${
               isRoomHost ? 'cursor-pointer hover:scale-105' : 'cursor-not-allowed opacity-70'
